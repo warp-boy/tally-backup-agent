@@ -101,11 +101,14 @@ $svcExe = $null
 $instExe = $null
 
 # First, check obvious dist folder under repo root
+$distDirCandidate = [System.IO.Path]::Combine($RepoRootPath, 'dist')
+$parentDistCandidate = [System.IO.Path]::Combine($RepoRootPath, '..', 'dist')
+
 $candidates = @(
-    Join-Path $RepoRootPath "dist\$svcName.exe",
-    Join-Path $RepoRootPath "dist\$instName.exe",
-    Join-Path $RepoRootPath "..\dist\$svcName.exe",
-    Join-Path $RepoRootPath "..\dist\$instName.exe"
+    [System.IO.Path]::Combine($distDirCandidate, "$svcName.exe"),
+    [System.IO.Path]::Combine($distDirCandidate, "$instName.exe"),
+    [System.IO.Path]::Combine($parentDistCandidate, "$svcName.exe"),
+    [System.IO.Path]::Combine($parentDistCandidate, "$instName.exe")
 )
 
 foreach ($cand in $candidates) {
