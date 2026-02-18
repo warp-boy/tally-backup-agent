@@ -64,6 +64,9 @@ if (-not $RepoRootObj) { $RepoRootObj = Get-Location }
 $RepoRootPath = $RepoRootObj | Select-Object -First 1 | ForEach-Object { if ($_.PSObject.Properties.Match('Path')) { $_.Path } else { $_.ToString() } }
 if (-not $RepoRootPath) { $RepoRootPath = (Get-Location).Path }
 
+# Ensure RepoRootPath is a plain string (Resolve-Path may return collections)
+$RepoRootPath = [string]$RepoRootPath
+
 # Ensure output directory exists inside the repository
 $resolvedOut = Join-Path $RepoRootPath $OutputDir
 if (-not (Test-Path $resolvedOut)) { New-Item -ItemType Directory -Path $resolvedOut -Force | Out-Null }
