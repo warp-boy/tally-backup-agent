@@ -67,21 +67,25 @@ if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | O
 Write-Host "Building service EXE (service_wrapper)..."
 $svcSpec = "agent/service_wrapper.py"
 $svcName = "TallyBackupAgent"
-$svcArgs = "--noconsole --clean"
+$svcArgs = @("--noconsole","--clean")
 
-$pyInstSvcArgs = "--onefile --name $svcName $svcSpec $svcArgs"
-if ($IconPath) { $pyInstSvcArgs += " --icon $IconPath" }
+$pyInstSvcArgs = @("--onefile","--name",$svcName,$svcSpec) + $svcArgs
+if ($IconPath) { $pyInstSvcArgs += @("--icon",$IconPath) }
 
-pyinstaller $pyInstSvcArgs
+Write-Host "PyInstaller args for service: $($pyInstSvcArgs -join ' ')"
+& pyinstaller @pyInstSvcArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "PyInstaller failed for service"; exit 1 }
 
 Write-Host "Building installer GUI EXE (installer_gui)..."
 $instSpec = "tools/installer_gui.py"
 $instName = "TallyBackupInstaller"
-$pyInstInstArgs = "--onefile --name $instName $instSpec --noconsole"
-if ($IconPath) { $pyInstInstArgs += " --icon $IconPath" }
+$instArgs = @("--noconsole")
 
-pyinstaller $pyInstInstArgs
+$pyInstInstArgs = @("--onefile","--name",$instName,$instSpec) + $instArgs
+if ($IconPath) { $pyInstInstArgs += @("--icon",$IconPath) }
+
+Write-Host "PyInstaller args for installer GUI: $($pyInstInstArgs -join ' ')"
+& pyinstaller @pyInstInstArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "PyInstaller failed for installer GUI"; exit 1 }
 
 # Collect artifacts
