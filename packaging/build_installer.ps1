@@ -30,8 +30,31 @@ function Ensure-Tool {
     }
 }
 
+function Resolve-Makensis {
+    $exe = Get-Command makensis -ErrorAction SilentlyContinue
+    if ($exe) { return $exe.Path }
+
+    $candidates = @(
+        "C:\\Program Files (x86)\\NSIS\\makensis.exe",
+        "C:\\Program Files\\NSIS\\makensis.exe",
+        "C:\\ProgramData\\chocolatey\\lib\\nsis\\tools\\makensis.exe"
+    )
+
+    foreach ($cand in $candidates) {
+        if (Test-Path $cand) { return $cand }
+    }
+
+    return $null
+}
+
 Ensure-Tool pyinstaller
-Ensure-Tool makensis
+$makensisPath = Resolve-Makensis
+if (-not $makensisPath) {
+    Write-Error "makensis not found on PATH or in common install locations. Please install NSIS or add makensis to PATH."
+    exit 1
+}
+Write-Host "Using makensis: $makensisPath"
+Set-Variable -Name MakensisExe -Value $makensisPath -Scope Script
 
 $ProjectRoot = Resolve-Path "..\.." -Relative | Split-Path -Parent
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -78,8 +101,8 @@ Copy-Item "$RepoRoot\packaging\resources\config.json.template" -Destination $dis
 
 Push-Location $distDir
 try {
-    Write-Host "Running makensis to build installer..."
-    makensis -V2 "install.nsi"
+    Write-Host "Running makensis to build installer using: $MakensisExe"
+    & $MakensisExe -V2 "install.nsi"
     if ($LASTEXITCODE -ne 0) { Write-Error "makensis failed"; exit 1 }
     Write-Host "Installer built: $(Get-ChildItem -Filter *.exe | Select-Object -First 1).FullName"
 } finally {
