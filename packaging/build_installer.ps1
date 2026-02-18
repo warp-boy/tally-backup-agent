@@ -56,13 +56,15 @@ if (-not $makensisPath) {
 Write-Host "Using makensis: $makensisPath"
 Set-Variable -Name MakensisExe -Value $makensisPath -Scope Script
 
-$ProjectRoot = Resolve-Path "..\.." -Relative | Split-Path -Parent
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$RepoRoot = Resolve-Path "$ScriptDir\..\..\" -ErrorAction SilentlyContinue
+# Repo root should be one level up from the packaging directory (the repository root)
+$RepoRoot = Resolve-Path (Join-Path $ScriptDir '..') -ErrorAction SilentlyContinue
 if (-not $RepoRoot) { $RepoRoot = Get-Location }
 
-$distDir = Join-Path $RepoRoot $OutputDir
-if (-not (Test-Path $distDir)) { New-Item -ItemType Directory -Path $distDir | Out-Null }
+# Ensure output directory exists inside the repository
+$resolvedOut = Join-Path $RepoRoot $OutputDir
+if (-not (Test-Path $resolvedOut)) { New-Item -ItemType Directory -Path $resolvedOut -Force | Out-Null }
+$distDir = Resolve-Path $resolvedOut | Select-Object -ExpandProperty Path
 
 Write-Host "Building service EXE (service_wrapper)..."
 $svcSpec = "agent/service_wrapper.py"
