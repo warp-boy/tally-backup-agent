@@ -90,13 +90,38 @@ Write-Host "PyInstaller args for installer GUI: $($pyInstInstArgs -join ' ')"
 & pyinstaller @pyInstInstArgs
 if ($LASTEXITCODE -ne 0) { Write-Error "PyInstaller failed for installer GUI"; exit 1 }
 
-# Collect artifacts
-$buildOut = Join-Path $RepoRoot "dist"
-$svcExe = Join-Path $buildOut ("$svcName.exe")
-$instExe = Join-Path $buildOut ("$instName.exe")
+# Collect artifacts: locate generated EXEs even if checkout path is nested
+$svcExe = $null
+$instExe = $null
 
-if (-not (Test-Path $svcExe)) { Write-Error "Service EXE not found: $svcExe"; exit 1 }
-if (-not (Test-Path $instExe)) { Write-Error "Installer EXE not found: $instExe"; exit 1 }
+# First, check obvious dist folder under repo root
+$candidates = @(
+    Join-Path $RepoRoot "dist\$svcName.exe",
+    Join-Path $RepoRoot "dist\$instName.exe",
+    Join-Path $RepoRoot "..\dist\$svcName.exe",
+    Join-Path $RepoRoot "..\dist\$instName.exe"
+)
+
+foreach ($cand in $candidates) {
+    if ((Test-Path $cand) -and ($svcExe -eq $null) -and ($cand -like "*$svcName.exe")) { $svcExe = (Resolve-Path $cand).Path }
+    if ((Test-Path $cand) -and ($instExe -eq $null) -and ($cand -like "*$instName.exe")) { $instExe = (Resolve-Path $cand).Path }
+}
+
+# If not found, search recursively for the expected EXE names (handles nested checkout dirs)
+if (-not $svcExe) {
+    $found = Get-ChildItem -Path $RepoRoot -Filter "$svcName.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { $svcExe = $found.FullName }
+}
+if (-not $instExe) {
+    $found = Get-ChildItem -Path $RepoRoot -Filter "$instName.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { $instExe = $found.FullName }
+}
+
+if (-not $svcExe) { Write-Error "Service EXE not found under repo: $svcName.exe"; exit 1 }
+if (-not $instExe) { Write-Error "Installer EXE not found under repo: $instName.exe"; exit 1 }
+
+Write-Host "Found service EXE: $svcExe"
+Write-Host "Found installer EXE: $instExe"
 
 Copy-Item $svcExe -Destination $distDir -Force
 Copy-Item $instExe -Destination $distDir -Force
