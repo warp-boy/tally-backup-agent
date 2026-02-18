@@ -36,12 +36,16 @@ jobs:
         run: dir ./release
 
       - name: Code sign artifacts (optional)
-        if: ${{ secrets.CODE_SIGN_PFX_BASE64 != '' && secrets.CODE_SIGN_PFX_PASS != '' }}
         shell: pwsh
         env:
           PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
           PFX_PASS: ${{ secrets.CODE_SIGN_PFX_PASS }}
         run: |
+          if ([string]::IsNullOrEmpty($env:PFX_BASE64) -or [string]::IsNullOrEmpty($env:PFX_PASS)) {
+            Write-Host "Code-signing secrets not set — skipping signing"
+            exit 0
+          }
+
           Write-Host "Decoding PFX from secret and writing cert.pfx"
           $bytes = [System.Convert]::FromBase64String($env:PFX_BASE64)
           [System.IO.File]::WriteAllBytes("cert.pfx", $bytes)
