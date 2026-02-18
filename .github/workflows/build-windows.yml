@@ -1,0 +1,70 @@
+name: Build Windows EXEs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install NSIS (choco)
+        run: choco install nsis -y
+
+      - name: Run Windows build script
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          ./packaging/build_installer.ps1 -Version "${{ github.run_number }}" -OutputDir ./release
+
+      - name: List release folder
+        run: dir ./release
+
+      - name: Code sign artifacts (optional)
+        if: ${{ secrets.CODE_SIGN_PFX_BASE64 != '' && secrets.CODE_SIGN_PFX_PASS != '' }}
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          PFX_PASS: ${{ secrets.CODE_SIGN_PFX_PASS }}
+        run: |
+          Write-Host "Decoding PFX from secret and writing cert.pfx"
+          $bytes = [System.Convert]::FromBase64String($env:PFX_BASE64)
+          [System.IO.File]::WriteAllBytes("cert.pfx", $bytes)
+
+          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          if (-not $signtool) {
+            # Try common Windows Kits path
+            $possible = "C:\\Program Files (x86)\\Windows Kits\\10\\bin"
+            $signtool = Get-ChildItem -Path $possible -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 | Select-Object -ExpandProperty FullName
+          }
+          if (-not $signtool) { Write-Error "signtool.exe not found on runner"; exit 1 }
+
+          Write-Host "Signing EXEs in release directory using signtool: $signtool"
+          Get-ChildItem -Path ./release -Filter *.exe -Recurse | ForEach-Object {
+            Write-Host "Signing $($_.FullName)"
+            & $signtool sign /fd SHA256 /a /f cert.pfx /p $env:PFX_PASS /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+          }
+          Remove-Item cert.pfx -ErrorAction SilentlyContinue
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tally-backup-windows-build
+          path: |
+            release
+            dist

@@ -1,0 +1,7 @@
+{
+  "s3_bucket": "your-bucket-name",
+  "client_id": "client-123",
+  "encryption_password": "CHANGE_ME_SECURELY",
+  "debounce_seconds": 120,
+  "aws_region": "us-east-1"
+}
