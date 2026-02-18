@@ -58,11 +58,14 @@ Set-Variable -Name MakensisExe -Value $makensisPath -Scope Script
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 # Repo root should be one level up from the packaging directory (the repository root)
-$RepoRoot = Resolve-Path (Join-Path $ScriptDir '..') -ErrorAction SilentlyContinue
-if (-not $RepoRoot) { $RepoRoot = Get-Location }
+$RepoRootObj = Resolve-Path (Join-Path $ScriptDir '..') -ErrorAction SilentlyContinue
+if (-not $RepoRootObj) { $RepoRootObj = Get-Location }
+# Normalize to a single string path (Resolve-Path may return PathInfo objects)
+$RepoRootPath = $RepoRootObj | Select-Object -First 1 | ForEach-Object { if ($_.PSObject.Properties.Match('Path')) { $_.Path } else { $_.ToString() } }
+if (-not $RepoRootPath) { $RepoRootPath = (Get-Location).Path }
 
 # Ensure output directory exists inside the repository
-$resolvedOut = Join-Path $RepoRoot $OutputDir
+$resolvedOut = Join-Path $RepoRootPath $OutputDir
 if (-not (Test-Path $resolvedOut)) { New-Item -ItemType Directory -Path $resolvedOut -Force | Out-Null }
 $distDir = Resolve-Path $resolvedOut | Select-Object -ExpandProperty Path
 
@@ -96,10 +99,10 @@ $instExe = $null
 
 # First, check obvious dist folder under repo root
 $candidates = @(
-    Join-Path $RepoRoot "dist\$svcName.exe",
-    Join-Path $RepoRoot "dist\$instName.exe",
-    Join-Path $RepoRoot "..\dist\$svcName.exe",
-    Join-Path $RepoRoot "..\dist\$instName.exe"
+    Join-Path $RepoRootPath "dist\$svcName.exe",
+    Join-Path $RepoRootPath "dist\$instName.exe",
+    Join-Path $RepoRootPath "..\dist\$svcName.exe",
+    Join-Path $RepoRootPath "..\dist\$instName.exe"
 )
 
 foreach ($cand in $candidates) {
@@ -109,11 +112,11 @@ foreach ($cand in $candidates) {
 
 # If not found, search recursively for the expected EXE names (handles nested checkout dirs)
 if (-not $svcExe) {
-    $found = Get-ChildItem -Path $RepoRoot -Filter "$svcName.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    $found = Get-ChildItem -Path $RepoRootPath -Filter "$svcName.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($found) { $svcExe = $found.FullName }
 }
 if (-not $instExe) {
-    $found = Get-ChildItem -Path $RepoRoot -Filter "$instName.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    $found = Get-ChildItem -Path $RepoRootPath -Filter "$instName.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($found) { $instExe = $found.FullName }
 }
 
@@ -127,8 +130,8 @@ Copy-Item $svcExe -Destination $distDir -Force
 Copy-Item $instExe -Destination $distDir -Force
 
 # Copy config template and NSIS script
-Copy-Item "$RepoRoot\packaging\install.nsi" -Destination $distDir -Force
-Copy-Item "$RepoRoot\packaging\resources\config.json.template" -Destination $distDir -Force
+Copy-Item (Join-Path $RepoRootPath 'packaging\install.nsi') -Destination $distDir -Force
+Copy-Item (Join-Path $RepoRootPath 'packaging\resources\config.json.template') -Destination $distDir -Force
 
 Push-Location $distDir
 try {
