@@ -47,5 +47,5 @@ Section "Uninstall"
   Delete "$INSTDIR\\TallyBackupAgent.exe"
   Delete "$INSTDIR\\TallyBackupInstaller.exe"
   RMDir "$INSTDIR"
-  DeleteShortCut "$DESKTOP\\TallyBackup Agent.lnk"
+  Delete "$DESKTOP\\TallyBackup Agent.lnk"
 SectionEnd
