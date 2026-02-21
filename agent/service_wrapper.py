@@ -13,6 +13,13 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+# If this module is executed as a script from an install folder (e.g. "C:\Program Files (x86)\...")
+# ensure the project root is on sys.path so package imports resolve correctly.
+_THIS_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _THIS_DIR.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 try:
     import win32serviceutil
     import win32service
@@ -24,8 +31,16 @@ except Exception:  # pragma: no cover - windows only
     win32event = None
     servicemanager = None
 
-from .service import AgentService
-from .logging_config import setup_logging
+try:
+    from .service import AgentService
+    from .logging_config import setup_logging
+except Exception:  # pragma: no cover - allow running file directly
+    try:
+        from agent.service import AgentService
+        from agent.logging_config import setup_logging
+    except Exception:
+        from service import AgentService
+        from logging_config import setup_logging
 
 logger = setup_logging()
 
