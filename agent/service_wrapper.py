@@ -13,13 +13,6 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-# If this module is executed as a script from an install folder (e.g. "C:\Program Files (x86)\...")
-# ensure the project root is on sys.path so package imports resolve correctly.
-_THIS_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _THIS_DIR.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
-
 try:
     import win32serviceutil
     import win32service
@@ -32,15 +25,16 @@ except Exception:  # pragma: no cover - windows only
     servicemanager = None
 
 try:
+    # Preferred: relative imports when used as a package (python -m agent.service_wrapper)
     from .service import AgentService
     from .logging_config import setup_logging
-except Exception:  # pragma: no cover - allow running file directly
+except Exception:
+    # Fallback: allow running the script directly (python agent/service_wrapper.py)
     try:
         from agent.service import AgentService
         from agent.logging_config import setup_logging
     except Exception:
-        from service import AgentService
-        from logging_config import setup_logging
+        raise
 
 logger = setup_logging()
 
@@ -100,7 +94,29 @@ class TallyBackupWindowsService(win32serviceutil.ServiceFramework):
 
 
 if __name__ == "__main__":
+    # Allow running in console mode for debugging on systems without pywin32
+    if "--console" in sys.argv:
+        try:
+            cfg = load_config()
+        except Exception as e:
+            print(f"Failed to load config: {e}")
+            sys.exit(1)
+
+        password = cfg.get("encryption_password", "").encode()
+        s3_bucket = cfg.get("s3_bucket")
+        client_id = cfg.get("client_id")
+        debounce = int(cfg.get("debounce_seconds", 120))
+        region = cfg.get("aws_region")
+
+        svc = AgentService(s3_bucket=s3_bucket, client_id=client_id, encryption_password=password, debounce_seconds=debounce, region=region)
+        try:
+            svc.start()
+        except KeyboardInterrupt:
+            svc.stop()
+        sys.exit(0)
+
     if win32serviceutil is None:
-        print("pywin32 is required to run the Windows service wrapper.")
+        print("pywin32 is required to run the Windows service wrapper. To run interactively for debugging, pass --console and ensure config exists in ProgramData\\TallyBackupAgent\\config.json")
         sys.exit(1)
+
     win32serviceutil.HandleCommandLine(TallyBackupWindowsService)
